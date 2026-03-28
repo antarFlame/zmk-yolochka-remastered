@@ -2,5 +2,6 @@
 include:
 - board: nice_nano@2.0.0//zmk
   shield: yolochka_remastered
+  snippet: zmk-usb-logging
   cmake-args: -DCONFIG_ZMK_STUDIO=y
 
