@@ -77,6 +77,10 @@
     };
 };
 
+&uart0 {
+    status = "disabled";
+};
+
 / {
     chosen {
         zmk,underglow = &led_strip;
