@@ -5,8 +5,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
 
-#include <drivers/ext_power.h>
-
 #define AUX_LED_STRIP_NODE DT_CHOSEN(yolochka_static_led_strip)
 
 #if DT_NODE_EXISTS(AUX_LED_STRIP_NODE)
@@ -28,22 +26,9 @@ static void yolochka_static_led_strip_start(struct k_work *work) {
     const struct device *strip = DEVICE_DT_GET(AUX_LED_STRIP_NODE);
     struct led_rgb pixels[AUX_LED_COUNT];
 
-#if DT_HAS_COMPAT_STATUS_OKAY(zmk_ext_power_generic)
-    const struct device *ext_power = DEVICE_DT_GET(DT_INST(0, zmk_ext_power_generic));
-#endif
-
     if (!device_is_ready(strip)) {
         return;
     }
-
-#if DT_HAS_COMPAT_STATUS_OKAY(zmk_ext_power_generic)
-    if (device_is_ready(ext_power)) {
-        int err = ext_power_enable(ext_power);
-        if (err < 0 && err != -EALREADY) {
-            return;
-        }
-    }
-#endif
 
     for (size_t i = 0; i < ARRAY_SIZE(pixels); i++) {
         pixels[i].r = AUX_LED_RED;
