@@ -5,9 +5,9 @@
 #include <zephyr/kernel.h>
 #include <zephyr/sys/util.h>
 
-#define AUX_LED_STRIP_NODE DT_CHOSEN(yolochka_static_led_strip)
+#if DT_HAS_CHOSEN(yolochka_static_led_strip)
 
-#if DT_NODE_EXISTS(AUX_LED_STRIP_NODE)
+#define AUX_LED_STRIP_NODE DT_CHOSEN(yolochka_static_led_strip)
 
 #define AUX_LED_COUNT DT_PROP(AUX_LED_STRIP_NODE, chain_length)
 #define AUX_LED_STARTUP_DELAY_MS 150
