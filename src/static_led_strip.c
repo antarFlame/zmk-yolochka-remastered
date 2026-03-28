@@ -10,7 +10,8 @@
 #define AUX_LED_STRIP_NODE DT_CHOSEN(yolochka_static_led_strip)
 
 #define AUX_LED_COUNT DT_PROP(AUX_LED_STRIP_NODE, chain_length)
-#define AUX_LED_STARTUP_DELAY_MS 150
+#define AUX_LED_STARTUP_DELAY_MS 1000
+#define AUX_LED_REFRESH_MS 1000
 
 /*
  * A fixed red glow for the extra strip on P0.08.
@@ -37,6 +38,7 @@ static void yolochka_static_led_strip_start(struct k_work *work) {
     }
 
     (void)led_strip_update_rgb(strip, pixels, ARRAY_SIZE(pixels));
+    k_work_schedule(&aux_led_start_work, K_MSEC(AUX_LED_REFRESH_MS));
 }
 
 static int yolochka_static_led_strip_init(void) {
