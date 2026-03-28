@@ -39,15 +39,20 @@ LOG_MODULE_REGISTER(yolochka_static_led_strip, CONFIG_LOG_DEFAULT_LEVEL);
  * We encode one LED data bit as one PWM period:
  * - 16 MHz base clock
  * - 20 ticks per period = 1.25 us
- * - duty  5/20 ~= 0.312 us for logical 0
- * - duty 10/20 ~= 0.625 us for logical 1
+ * - duty  6/20 ~= 0.375 us for logical 0
+ * - duty 13/20 ~= 0.812 us for logical 1
  *
  * This is conceptually closer to libraries like LiteLED that rely on
  * hardware-timed symbol generation instead of CPU busy-wait loops.
+ *
+ * For nRF PWM sequence values, bit 15 controls output polarity. WS2812 PWM
+ * implementations on nRF set this bit so the line returns low after each
+ * symbol and stays low during the reset tail.
  */
 #define AUX_LED_PWM_TOP 20U
-#define AUX_LED_PWM_T0H 5U
-#define AUX_LED_PWM_T1H 10U
+#define AUX_LED_PWM_T0H 6U
+#define AUX_LED_PWM_T1H 13U
+#define AUX_LED_PWM_POLARITY BIT(15)
 #define AUX_LED_RESET_SLOTS 128U
 
 #define AUX_LED_BITS_PER_PIXEL 24U
@@ -90,7 +95,8 @@ static void aux_led_get_color_for_index(int led_index, uint8_t *red, uint8_t *gr
 
 static size_t aux_led_encode_byte(size_t slot, uint8_t value) {
     for (int bit = 7; bit >= 0; bit--) {
-        aux_led_pwm_values[slot++] = (value & BIT(bit)) ? AUX_LED_PWM_T1H : AUX_LED_PWM_T0H;
+        aux_led_pwm_values[slot++] =
+            ((value & BIT(bit)) ? AUX_LED_PWM_T1H : AUX_LED_PWM_T0H) | AUX_LED_PWM_POLARITY;
     }
 
     return slot;
@@ -121,7 +127,7 @@ static void aux_led_prepare_frame(void) {
     }
 
     while (slot < ARRAY_SIZE(aux_led_pwm_values)) {
-        aux_led_pwm_values[slot++] = 0;
+        aux_led_pwm_values[slot++] = AUX_LED_PWM_POLARITY;
     }
 }
 
