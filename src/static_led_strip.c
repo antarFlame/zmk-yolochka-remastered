@@ -14,9 +14,9 @@ LOG_MODULE_REGISTER(yolochka_static_led_strip, CONFIG_LOG_DEFAULT_LEVEL);
 #define AUX_LED_COUNT 5
 #define AUX_LED_STARTUP_DELAY_MS 1000
 #define AUX_LED_REFRESH_MS 1000
-#define AUX_LED_PERIOD_NS 1250
-#define AUX_LED_T0H_NS 350
-#define AUX_LED_T1H_NS 700
+#define AUX_LED_PERIOD_NS 1200
+#define AUX_LED_T0H_NS 200
+#define AUX_LED_T1H_NS 550
 #define AUX_LED_RESET_US 80
 
 #define NS_TO_CYCLES(ns)                                                                           \
@@ -50,6 +50,12 @@ static inline uint8_t aux_led_scale(uint8_t value) {
     return (uint8_t)(((uint16_t)value * AUX_LED_BRIGHTNESS) / 255U);
 }
 
+/*
+ * These timings are intentionally shorter than the datasheet values.
+ * The software overhead of k_cycle_get_32() and GPIO writes stretches the
+ * real pulse widths, so we compensate here to keep logical 0s from being
+ * interpreted as 1s.
+ */
 static inline void aux_led_wait_until(uint32_t start_cycles, uint32_t delta_cycles) {
     while ((uint32_t)(k_cycle_get_32() - start_cycles) < delta_cycles) {
     }
