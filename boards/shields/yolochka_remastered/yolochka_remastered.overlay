@@ -1,4 +1,3 @@
-#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/led/led.h>
 #include "yolochka_remastered.dtsi"
 
@@ -47,10 +46,6 @@
 };
 
 / {
-    static_led_gpio: static_led_gpio {
-        gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
-    };
-
     chosen {
         zmk,underglow = &led_strip;
     };
