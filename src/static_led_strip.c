@@ -5,27 +5,17 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
-#include <hal/nrf_gpio.h>
+#include <soc.h>
 
 LOG_MODULE_REGISTER(yolochka_static_led_strip, CONFIG_LOG_DEFAULT_LEVEL);
 
-#define AUX_LED_PIN NRF_GPIO_PIN_MAP(0, 8)
+#define AUX_LED_PIN 8U
+#define AUX_LED_PIN_MASK BIT(AUX_LED_PIN)
 
 #define AUX_LED_COUNT 5
 #define AUX_LED_STARTUP_DELAY_MS 1000
 #define AUX_LED_REFRESH_MS 1000
-
-#define AUX_LED_PERIOD_NS 1250
-#define AUX_LED_T0H_NS 350
-#define AUX_LED_T1H_NS 700
 #define AUX_LED_RESET_US 80
-
-#define NS_TO_CYCLES(ns)                                                                           \
-    ((uint32_t)((((uint64_t)CONFIG_SYS_CLOCK_HW_CYCLES_PER_SEC) * (ns)) / 1000000000ULL))
-
-#define AUX_LED_PERIOD_CYCLES NS_TO_CYCLES(AUX_LED_PERIOD_NS)
-#define AUX_LED_T0H_CYCLES NS_TO_CYCLES(AUX_LED_T0H_NS)
-#define AUX_LED_T1H_CYCLES NS_TO_CYCLES(AUX_LED_T1H_NS)
 
 /*
  * User-tunable color setup.
@@ -51,23 +41,53 @@ static inline uint8_t aux_led_scale(uint8_t value) {
     return (uint8_t)(((uint16_t)value * AUX_LED_BRIGHTNESS) / 255U);
 }
 
-static inline void aux_led_wait_until(uint32_t start_cycles, uint32_t delta_cycles) {
-    while ((uint32_t)(k_cycle_get_32() - start_cycles) < delta_cycles) {
-    }
-}
+/*
+ * Timing-sensitive GPIO bitbang for SK6812/WS2812 on nRF52840 @ 64 MHz.
+ * If colors are still wrong, the first thing to tune is the NOP counts below.
+ */
+#define AUX_LED_SET_HIGH "str %[pin], [%[base], #0]\n"
+#define AUX_LED_SET_LOW "str %[pin], [%[base], #4]\n"
 
-static inline void aux_led_send_bit(bool one) {
-    uint32_t start_cycles = k_cycle_get_32();
+#define AUX_LED_DELAY_T1H                                                                            \
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"                                                     \
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"                                                     \
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"                                                     \
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"
 
-    nrf_gpio_pin_set(AUX_LED_PIN);
-    aux_led_wait_until(start_cycles, one ? AUX_LED_T1H_CYCLES : AUX_LED_T0H_CYCLES);
-    nrf_gpio_pin_clear(AUX_LED_PIN);
-    aux_led_wait_until(start_cycles, AUX_LED_PERIOD_CYCLES);
-}
+#define AUX_LED_DELAY_T0H                                                                            \
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"                                                     \
+    "nop\nnop\nnop\nnop\n"
+
+#define AUX_LED_DELAY_TXL                                                                            \
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"                                                     \
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"                                                     \
+    "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"
+
+#define AUX_LED_ONE_BIT(base, pin)                                                                  \
+    do {                                                                                            \
+        __asm__ volatile(AUX_LED_SET_HIGH AUX_LED_DELAY_T1H AUX_LED_SET_LOW AUX_LED_DELAY_TXL      \
+                         :                                                                          \
+                         : [base] "l"(base), [pin] "l"(pin)                                        \
+                         : "memory");                                                              \
+    } while (false)
+
+#define AUX_LED_ZERO_BIT(base, pin)                                                                 \
+    do {                                                                                            \
+        __asm__ volatile(AUX_LED_SET_HIGH AUX_LED_DELAY_T0H AUX_LED_SET_LOW AUX_LED_DELAY_TXL      \
+                         :                                                                          \
+                         : [base] "l"(base), [pin] "l"(pin)                                        \
+                         : "memory");                                                              \
+    } while (false)
 
 static void aux_led_send_byte(uint8_t value) {
+    volatile uint32_t *base = (volatile uint32_t *)&NRF_P0->OUTSET;
+
     for (int bit = 7; bit >= 0; bit--) {
-        aux_led_send_bit((value & BIT(bit)) != 0U);
+        if (value & BIT(bit)) {
+            AUX_LED_ONE_BIT(base, AUX_LED_PIN_MASK);
+        } else {
+            AUX_LED_ZERO_BIT(base, AUX_LED_PIN_MASK);
+        }
     }
 }
 
@@ -126,8 +146,8 @@ static void yolochka_static_led_strip_start(struct k_work *work) {
 }
 
 static int yolochka_static_led_strip_init(void) {
-    nrf_gpio_cfg_output(AUX_LED_PIN);
-    nrf_gpio_pin_clear(AUX_LED_PIN);
+    NRF_P0->DIRSET = AUX_LED_PIN_MASK;
+    NRF_P0->OUTCLR = AUX_LED_PIN_MASK;
 
     k_work_init_delayable(&aux_led_start_work, yolochka_static_led_strip_start);
     k_work_schedule(&aux_led_start_work, K_MSEC(AUX_LED_STARTUP_DELAY_MS));
