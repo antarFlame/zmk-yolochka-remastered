@@ -14,20 +14,22 @@ LOG_MODULE_REGISTER(yolochka_static_led_strip, CONFIG_LOG_DEFAULT_LEVEL);
 
 #define AUX_LED_COUNT 5
 #define AUX_LED_STARTUP_DELAY_MS 1000
-#define AUX_LED_REFRESH_MS 1000
+#define AUX_LED_FRAME_INTERVAL_MS 200
 
 /*
  * User-tunable color setup.
  *
  * 1. Change AUX_LED_BRIGHTNESS to set overall brightness.
  *    255 = max, 128 ~= 50%, 32 = dim.
- * 2. Change AUX_LED_COLORS below to assign an individual color to each LED.
- *    Format per row: { red, green, blue }.
+ * 2. Change AUX_LED_FRAME_INTERVAL_MS to set animation speed in milliseconds.
+ * 3. Change AUX_LED_ANIMATION below to define animation frames.
+ *    Format: [frame][led] = { red, green, blue }.
  *    LED 1 is the first LED connected to DIN, LED 5 is the last one.
- * 3. If the strip shows the wrong color, adjust the byte order in
+ * 4. If the strip shows the wrong color, adjust the byte order in
  *    aux_led_encode_pixel(). Many WS2812/SK6812 strips are GRB, but not all.
  */
 #define AUX_LED_BRIGHTNESS 128
+#define AUX_LED_ANIMATION_FRAMES 5
 
 struct aux_led_rgb {
     uint8_t red;
@@ -35,12 +37,42 @@ struct aux_led_rgb {
     uint8_t blue;
 };
 
-static const struct aux_led_rgb AUX_LED_COLORS[AUX_LED_COUNT] = {
-    {255, 0, 0},   /* LED 1 */
-    {192, 0, 64},  /* LED 2 */
-    {128, 0, 128}, /* LED 3 */
-    {64, 0, 192},  /* LED 4 */
-    {0, 0, 255},   /* LED 5 */
+static const struct aux_led_rgb AUX_LED_ANIMATION[AUX_LED_ANIMATION_FRAMES][AUX_LED_COUNT] = {
+    {
+        {0, 0, 255},
+        {255, 0, 0},
+        {0, 255, 0},
+        {128, 0, 128},
+        {255, 255, 255},
+    },
+    {
+        {255, 255, 255},
+        {0, 0, 255},
+        {255, 0, 0},
+        {0, 255, 0},
+        {128, 0, 128},
+    },
+    {
+        {128, 0, 128},
+        {255, 255, 255},
+        {0, 0, 255},
+        {255, 0, 0},
+        {0, 255, 0},
+    },
+    {
+        {0, 255, 0},
+        {128, 0, 128},
+        {255, 255, 255},
+        {0, 0, 255},
+        {255, 0, 0},
+    },
+    {
+        {255, 0, 0},
+        {0, 255, 0},
+        {128, 0, 128},
+        {255, 255, 255},
+        {0, 0, 255},
+    },
 };
 
 /*
@@ -70,6 +102,7 @@ static const struct aux_led_rgb AUX_LED_COLORS[AUX_LED_COUNT] = {
 
 static struct k_work_delayable aux_led_start_work;
 static uint32_t aux_led_attempt;
+static uint8_t aux_led_frame_index;
 static bool aux_led_pwm_ready;
 
 static nrfx_pwm_t aux_led_pwm = NRFX_PWM_INSTANCE(0);
@@ -90,11 +123,11 @@ static void aux_led_get_color_for_index(int led_index, uint8_t *red, uint8_t *gr
     const struct aux_led_rgb *color;
 
     /*
-     * Each LED uses a color from AUX_LED_COLORS.
-     * Update the array above if you want a different fixed pattern.
+     * Each LED uses the color from the currently active animation frame.
+     * Update AUX_LED_ANIMATION above if you want a different sequence.
      */
     led_index = CLAMP(led_index, 0, AUX_LED_COUNT - 1);
-    color = &AUX_LED_COLORS[led_index];
+    color = &AUX_LED_ANIMATION[aux_led_frame_index][led_index];
 
     *red = aux_led_scale(color->red);
     *green = aux_led_scale(color->green);
@@ -180,7 +213,8 @@ static void yolochka_static_led_strip_start(struct k_work *work) {
     aux_led_send_frame();
     LOG_INF("Attempt %u: PWM-updated %u pixels on P0.08", aux_led_attempt, AUX_LED_COUNT);
 
-    k_work_schedule(&aux_led_start_work, K_MSEC(AUX_LED_REFRESH_MS));
+    aux_led_frame_index = (aux_led_frame_index + 1U) % AUX_LED_ANIMATION_FRAMES;
+    k_work_schedule(&aux_led_start_work, K_MSEC(AUX_LED_FRAME_INTERVAL_MS));
 }
 
 static int yolochka_static_led_strip_init(void) {
