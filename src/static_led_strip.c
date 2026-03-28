@@ -21,12 +21,27 @@ LOG_MODULE_REGISTER(yolochka_static_led_strip, CONFIG_LOG_DEFAULT_LEVEL);
  *
  * 1. Change AUX_LED_BRIGHTNESS to set overall brightness.
  *    255 = max, 128 ~= 50%, 32 = dim.
- * 2. Change the values in aux_led_get_color_for_index() to set a fixed
- *    palette or gradient for the 5 LEDs.
+ * 2. Change AUX_LED_COLORS below to assign an individual color to each LED.
+ *    Format per row: { red, green, blue }.
+ *    LED 1 is the first LED connected to DIN, LED 5 is the last one.
  * 3. If the strip shows the wrong color, adjust the byte order in
  *    aux_led_encode_pixel(). Many WS2812/SK6812 strips are GRB, but not all.
  */
 #define AUX_LED_BRIGHTNESS 128
+
+struct aux_led_rgb {
+    uint8_t red;
+    uint8_t green;
+    uint8_t blue;
+};
+
+static const struct aux_led_rgb AUX_LED_COLORS[AUX_LED_COUNT] = {
+    {255, 0, 0},   /* LED 1 */
+    {192, 0, 64},  /* LED 2 */
+    {128, 0, 128}, /* LED 3 */
+    {64, 0, 192},  /* LED 4 */
+    {0, 0, 255},   /* LED 5 */
+};
 
 /*
  * PWM timings for WS2812/SK6812-like LEDs.
@@ -72,28 +87,18 @@ static inline uint8_t aux_led_scale(uint8_t value) {
 
 static void aux_led_get_color_for_index(int led_index, uint8_t *red, uint8_t *green,
                                         uint8_t *blue) {
-    static const uint8_t aux_led_palette[AUX_LED_COUNT][3] = {
-        {255, 0, 0},
-        {192, 0, 64},
-        {128, 0, 128},
-        {64, 0, 192},
-        {0, 0, 255},
-    };
+    const struct aux_led_rgb *color;
 
     /*
-     * This is the color assignment algorithm for the strip.
-     * Right now the 5 LEDs form a fixed red -> purple -> blue gradient.
-     *
-     * If you want another pattern, replace values in aux_led_palette.
-     * Example:
-     * if (led_index == 0) { *red = 255; *green = 0; *blue = 0; }
-     * else { *red = 0; *green = 0; *blue = 255; }
+     * Each LED uses a color from AUX_LED_COLORS.
+     * Update the array above if you want a different fixed pattern.
      */
     led_index = CLAMP(led_index, 0, AUX_LED_COUNT - 1);
+    color = &AUX_LED_COLORS[led_index];
 
-    *red = aux_led_scale(aux_led_palette[led_index][0]);
-    *green = aux_led_scale(aux_led_palette[led_index][1]);
-    *blue = aux_led_scale(aux_led_palette[led_index][2]);
+    *red = aux_led_scale(color->red);
+    *green = aux_led_scale(color->green);
+    *blue = aux_led_scale(color->blue);
 }
 
 static size_t aux_led_encode_byte(size_t slot, uint8_t value) {
