@@ -5,6 +5,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/util.h>
 
+#include <hal/nrf_gpio.h>
 #include <nrfx_pwm.h>
 
 LOG_MODULE_REGISTER(yolochka_static_led_strip, CONFIG_LOG_DEFAULT_LEVEL);
