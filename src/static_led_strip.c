@@ -45,8 +45,8 @@ static inline uint8_t aux_led_scale(uint8_t value) {
  * Timing-sensitive GPIO bitbang for SK6812/WS2812 on nRF52840 @ 64 MHz.
  * If colors are still wrong, the first thing to tune is the NOP counts below.
  */
-#define AUX_LED_SET_HIGH "str %[pin], [%[base], #0]\n"
-#define AUX_LED_SET_LOW "str %[pin], [%[base], #4]\n"
+#define AUX_LED_SET_HIGH "str %[mask], [%[outset], #0]\n"
+#define AUX_LED_SET_LOW "str %[mask], [%[outset], #4]\n"
 
 #define AUX_LED_DELAY_T1H                                                                            \
     "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"                                                     \
@@ -63,19 +63,19 @@ static inline uint8_t aux_led_scale(uint8_t value) {
     "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"                                                     \
     "nop\nnop\nnop\nnop\nnop\nnop\nnop\nnop\n"
 
-#define AUX_LED_ONE_BIT(base, pin)                                                                  \
+#define AUX_LED_ONE_BIT(outset_reg, pin_mask)                                                       \
     do {                                                                                            \
         __asm__ volatile(AUX_LED_SET_HIGH AUX_LED_DELAY_T1H AUX_LED_SET_LOW AUX_LED_DELAY_TXL      \
                          :                                                                          \
-                         : [base] "l"(base), [pin] "l"(pin)                                        \
+                         : [outset] "l"(outset_reg), [mask] "l"(pin_mask)                          \
                          : "memory");                                                              \
     } while (false)
 
-#define AUX_LED_ZERO_BIT(base, pin)                                                                 \
+#define AUX_LED_ZERO_BIT(outset_reg, pin_mask)                                                      \
     do {                                                                                            \
         __asm__ volatile(AUX_LED_SET_HIGH AUX_LED_DELAY_T0H AUX_LED_SET_LOW AUX_LED_DELAY_TXL      \
                          :                                                                          \
-                         : [base] "l"(base), [pin] "l"(pin)                                        \
+                         : [outset] "l"(outset_reg), [mask] "l"(pin_mask)                          \
                          : "memory");                                                              \
     } while (false)
 
