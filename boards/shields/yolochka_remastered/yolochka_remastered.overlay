@@ -1,3 +1,4 @@
+#include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/led/led.h>
 #include "yolochka_remastered.dtsi"
 
@@ -11,19 +12,6 @@
     spi3_sleep: spi3_sleep {
         group1 {
             psels = <NRF_PSEL(SPIM_MOSI, 0, 6)>;
-            low-power-enable;
-        };
-    };
-
-    spi0_default: spi0_default {
-        group1 {
-            psels = <NRF_PSEL(SPIM_MOSI, 0, 8)>;
-        };
-    };
-
-    spi0_sleep: spi0_sleep {
-        group1 {
-            psels = <NRF_PSEL(SPIM_MOSI, 0, 8)>;
             low-power-enable;
         };
     };
@@ -54,36 +42,16 @@
     };
 };
 
-&spi0 {
-    compatible = "nordic,nrf-spim";
-    status = "okay";
-
-    pinctrl-0 = <&spi0_default>;
-    pinctrl-1 = <&spi0_sleep>;
-    pinctrl-names = "default", "sleep";
-
-    static_led_strip: ws2812@0 {
-        compatible = "worldsemi,ws2812-spi";
-
-        reg = <0>;
-        spi-max-frequency = <4000000>;
-
-        chain-length = <5>;
-        spi-one-frame = <0x70>;
-        spi-zero-frame = <0x40>;
-        color-mapping = <LED_COLOR_ID_GREEN
-                         LED_COLOR_ID_RED
-                         LED_COLOR_ID_BLUE>;
-    };
-};
-
 &uart0 {
     status = "disabled";
 };
 
 / {
+    static_led_gpio: static_led_gpio {
+        gpios = <&gpio0 8 GPIO_ACTIVE_HIGH>;
+    };
+
     chosen {
         zmk,underglow = &led_strip;
-        yolochka,static-led-strip = &static_led_strip;
     };
 };
