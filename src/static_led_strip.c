@@ -39,16 +39,16 @@ LOG_MODULE_REGISTER(yolochka_static_led_strip, CONFIG_LOG_DEFAULT_LEVEL);
  * We encode one LED data bit as one PWM period:
  * - 16 MHz base clock
  * - 20 ticks per period = 1.25 us
- * - duty  6/20 ~= 0.375 us for logical 0
- * - duty 13/20 ~= 0.812 us for logical 1
+ * - duty  5/20 ~= 0.312 us for logical 0
+ * - duty 10/20 ~= 0.625 us for logical 1
  *
  * This is conceptually closer to libraries like LiteLED that rely on
  * hardware-timed symbol generation instead of CPU busy-wait loops.
  */
 #define AUX_LED_PWM_TOP 20U
-#define AUX_LED_PWM_T0H 6U
-#define AUX_LED_PWM_T1H 13U
-#define AUX_LED_RESET_SLOTS 64U
+#define AUX_LED_PWM_T0H 5U
+#define AUX_LED_PWM_T1H 10U
+#define AUX_LED_RESET_SLOTS 128U
 
 #define AUX_LED_BITS_PER_PIXEL 24U
 #define AUX_LED_FRAME_SLOTS ((AUX_LED_COUNT * AUX_LED_BITS_PER_PIXEL) + AUX_LED_RESET_SLOTS)
