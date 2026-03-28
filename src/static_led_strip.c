@@ -28,15 +28,28 @@ LOG_MODULE_REGISTER(yolochka_static_led_strip, CONFIG_LOG_DEFAULT_LEVEL);
 #define AUX_LED_T1H_CYCLES NS_TO_CYCLES(AUX_LED_T1H_NS)
 
 /*
- * A fixed red glow for the extra strip on P0.08.
- * 128 is about 50% of the 8-bit channel range.
+ * User-tunable color setup.
+ *
+ * 1. Change AUX_LED_BRIGHTNESS to set overall brightness.
+ *    255 = max, 128 ~= 50%, 32 = dim.
+ * 2. Change AUX_LED_BASE_RED/GREEN/BLUE to set the base color.
+ *    Example red:   255,   0,   0
+ *    Example green:   0, 255,   0
+ *    Example white: 255, 255, 255
+ * 3. If the strip shows the wrong color, adjust the byte order in
+ *    aux_led_send_pixel(). Many WS2812/SK6812 strips are GRB, but not all.
  */
-#define AUX_LED_RED 128
-#define AUX_LED_GREEN 0
-#define AUX_LED_BLUE 0
+#define AUX_LED_BRIGHTNESS 128
+#define AUX_LED_BASE_RED 255
+#define AUX_LED_BASE_GREEN 0
+#define AUX_LED_BASE_BLUE 0
 
 static struct k_work_delayable aux_led_start_work;
 static uint32_t aux_led_attempt;
+
+static inline uint8_t aux_led_scale(uint8_t value) {
+    return (uint8_t)(((uint16_t)value * AUX_LED_BRIGHTNESS) / 255U);
+}
 
 static inline void aux_led_wait_until(uint32_t start_cycles, uint32_t delta_cycles) {
     while ((uint32_t)(k_cycle_get_32() - start_cycles) < delta_cycles) {
@@ -58,13 +71,44 @@ static void aux_led_send_byte(uint8_t value) {
     }
 }
 
+static void aux_led_send_pixel(uint8_t red, uint8_t green, uint8_t blue) {
+    /*
+     * Current byte order is GRB.
+     * If "red" comes out as another color on your strip, swap the order here.
+     */
+    aux_led_send_byte(green);
+    aux_led_send_byte(red);
+    aux_led_send_byte(blue);
+}
+
+static void aux_led_get_color_for_index(int led_index, uint8_t *red, uint8_t *green,
+                                        uint8_t *blue) {
+    ARG_UNUSED(led_index);
+
+    /*
+     * This is the color assignment algorithm for the strip.
+     * Right now all LEDs use one shared static color.
+     *
+     * If you want a gradient or per-LED colors, change this function.
+     * Example:
+     * if (led_index == 0) { *red = 255; *green = 0; *blue = 0; }
+     * else { *red = 0; *green = 0; *blue = 255; }
+     */
+    *red = aux_led_scale(AUX_LED_BASE_RED);
+    *green = aux_led_scale(AUX_LED_BASE_GREEN);
+    *blue = aux_led_scale(AUX_LED_BASE_BLUE);
+}
+
 static void aux_led_send_frame(void) {
     unsigned int key = irq_lock();
 
     for (int i = 0; i < AUX_LED_COUNT; i++) {
-        aux_led_send_byte(AUX_LED_GREEN);
-        aux_led_send_byte(AUX_LED_RED);
-        aux_led_send_byte(AUX_LED_BLUE);
+        uint8_t red;
+        uint8_t green;
+        uint8_t blue;
+
+        aux_led_get_color_for_index(i, &red, &green, &blue);
+        aux_led_send_pixel(red, green, blue);
     }
 
     irq_unlock(key);
